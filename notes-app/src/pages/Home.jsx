@@ -1,52 +1,15 @@
-import React from "react";
-import NoteCard from "../components/NoteList";
+// pages/Home.js
+import React, { useState, useEffect } from "react";
+import { Input, List, Button, message } from "antd";
+import AddNote from "./AddNote";
+import { SearchOutlined } from "@ant-design/icons";
+import { Card } from "antd";
+const { Item } = List;
+import { deleteNote as apiDeleteNote, getNotes } from "../utils/network"; // Perubahan 1
+import { Spin } from "antd";
 
-const Home = () => {
-  const items = [
-    {
-      id: 1,
-      title: "Badminton",
-      description:
-        "suatu olahraga yang menggunakan alat yang berbentuk bulat dengan memiliki rongga-rongga di bagian pemukulnya. Dan memiliki gagang. Alat ini dikenal dengan nama raket yang dimainkan oleh dua orang (untuk tunggal) atau dua pasangan (untuk ganda) yang saling berlawanan!",
-      createdAt: new Date(),
-    },
-    {
-      id: 2,
-      title: "Basket",
-      description:
-        " olahraga bola berkelompok yang terdiri atas dua tim beranggotakan masing-masing lima orang yang saling bertanding mencetak poin dengan memasukkan bola ke dalam keranjang lawan!",
-      createdAt: new Date(),
-    },
-    {
-      id: 3,
-      title: "Futsal",
-      description:
-        "sebuah permainan bola yang dimainkan oleh dua tim, yang masing-masing timnya memiliki jumlah anggota yakni lima orang. Tujuan dari permainan adalah untuk memasukkan bola ke gawang lawan sebanyak, dengan memanipulasi bola dengan kaki!",
-      createdAt: new Date(),
-    },
-  ];
-  return (
-    <div className="bg-white py-14 sm:py-22">
-      <div className="mx-auto max-w-7xl px-6 lg:px-50">
-        <div className="mx-auto max-w-2xl lg:text-center">
-          <h2 className="text-6xl font-copperplate">NoteBook</h2>
-        </div>
-        <div className="mx-auto pt-5 mb-3 xl:w-96">
-          <input
-            type="search"
-            className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5  dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500 focus:shadow-outline"
-            id="searchNote"
-            placeholder="Search Note"
-          />
-        </div>
-        <div className="mx-auto mt-10 grid max-w-2xl grid-cols-1 gap-x-8 gap-y-16 border-t border-amber pt-10 sm:mt-10 sm:pt-16 lg:mx-0 lg:max-w-none lg:grid-cols-3">
-          {items.map((item) => (
-            <NoteCard item={item} />
-          ))}
-        </div>
-      </div>
-    </div>
-  );
+const Home = ({ notes, setNotes }) => {
+  const [loading, setLoading] = useState(false);
 
   const [searchResults, setSearchResults] = useState([]);
   const [filteredNotes, setFilteredNotes] = useState([]);
@@ -56,39 +19,102 @@ const Home = () => {
     // Ambil catatan dari localStorage saat komponen dimount
     const storedNotes = JSON.parse(localStorage.getItem("noteData")) || [];
     setNotes(storedNotes);
-    setHardcodedNotes(storedNotes);
+    //setHardcodedNotes(storedNotes);
     setFilteredNotes(storedNotes); // Sesuaikan filteredNotes juga jika diperlukan
   }, [setNotes]); // Watch for changes in 'notes' prop
 
   useEffect(() => {
-    const filtered = hardcodedNotes.filter((note) =>
+    const filtered = notes.filter((note) =>
       note.title.toLowerCase().includes(searchTerm.toLowerCase())
     );
     setFilteredNotes(filtered);
     setSearchResults(filtered);
-  }, [searchTerm, hardcodedNotes]);
+  }, [searchTerm, notes]);
 
-  const handleDelete = (id) => {
-    setNotes((prevNotes) => {
-      const updatedNotes = prevNotes.filter((note) => note.id !== id);
-      localStorage.setItem("noteData", JSON.stringify(updatedNotes)); // Update localStorage
-      setHardcodedNotes(updatedNotes); // Update hardcodedNotes state
-      setFilteredNotes(updatedNotes); // Update filteredNotes state
-      setSearchResults(updatedNotes); // Update searchResults state
-      return updatedNotes;
-    });
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true); // Set loading to true
+        const { error, data } = await getNotes();
+
+        if (!error) {
+          setNotes(data);
+          //updateLocalStorage(data);
+        } else {
+          console.error("Error fetching notes:", error);
+        }
+      } finally {
+        setLoading(false); // Set loading to false, regardless of success or failure
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  const handleDelete = async (id) => {
+    console.log("Deleting note with ID:", id);
+
+    try {
+      const response = await apiDeleteNote(id);
+
+      if (!response.error) {
+        // Remove the deleted note from local state immediately
+        setNotes((prevNotes) => prevNotes.filter((note) => note.id !== id));
+        setSearchResults((prevResults) =>
+          prevResults.filter((note) => note.id !== id)
+        );
+        setFilteredNotes((prevFiltered) =>
+          prevFiltered.filter((note) => note.id !== id)
+        );
+        updateLocalStorage(notes.filter((note) => note.id !== id));
+
+        // Show success message
+        message.success("Note deleted successfully.");
+      } else if (response.code === 404) {
+        console.error("Note not found:", id);
+        message.error("Note not found. Please refresh the page.");
+      } else {
+        console.error("Failed to delete note:", response.error);
+        message.error("Failed to delete note. Please try again.");
+      }
+    } catch (error) {
+      console.error("Error deleting note:", error);
+      message.error("Failed to delete note. Please try again.");
+    }
   };
 
-  const addNote = (newNote) => {
-    setNotes((prevNotes) => {
-      const updatedNotes = [...prevNotes, newNote];
-      localStorage.setItem("noteData", JSON.stringify(updatedNotes));
-      setHardcodedNotes(updatedNotes);
-      setFilteredNotes(updatedNotes);
-      setSearchResults(updatedNotes);
-      return updatedNotes;
-    });
+  const addNote = async (newNote) => {
+    try {
+      const { error, data } = await apiAddNote({
+        title: newNote.title,
+        body: newNote.body,
+      });
+
+      if (!error) {
+        setNotes((prevNotes) => {
+          const updatedNotes = [...prevNotes, data];
+          updateLocalStorage(updatedNotes);
+          return updatedNotes;
+        });
+      } else {
+        console.error("Failed to add note:", error);
+        // Handle error, show message, etc.
+        message.error("Failed to add note. Please try again.");
+      }
+    } catch (error) {
+      console.error("Error adding note:", error);
+      // Handle error, show message, etc.
+      message.error("Failed to add note. Please try again.");
+    }
   };
+
+  const updateLocalStorage = (updatedNotes) => {
+    localStorage.setItem("noteData", JSON.stringify(updatedNotes));
+  };
+
+  useEffect(() => {
+    updateLocalStorage(notes);
+  }, [notes]);
 
   return (
     <section>
@@ -100,31 +126,35 @@ const Home = () => {
         suffix={<SearchOutlined />}
         style={{ marginBottom: "16px" }}
       />
-      <List
-        grid={{ gutter: 16, column: 1 }}
-        dataSource={searchResults}
-        renderItem={(note) => (
-          <List.Item>
-            <Card
-              title={
-                <div
-                  style={{ display: "flex", justifyContent: "space-between" }}
-                >
-                  <div>{note.title}</div>
-                  <div>{note.createdAt}</div>
-                </div>
-              }
-              actions={[
-                <Button type="link" onClick={() => handleDelete(note.id)}>
-                  Hapus
-                </Button>,
-              ]}
-            >
-              <p style={{ textAlign: "left" }}>{note.body}</p>
-            </Card>
-          </List.Item>
-        )}
-      />
+      {loading ? (
+        <Spin size="large" />
+      ) : (
+        <List
+          grid={{ gutter: 16, column: 1 }}
+          dataSource={searchResults}
+          renderItem={(note) => (
+            <List.Item>
+              <Card
+                title={
+                  <div
+                    style={{ display: "flex", justifyContent: "space-between" }}
+                  >
+                    <div>{note.title}</div>
+                    <div>{new Date(note.createdAt).toLocaleDateString()}</div>
+                  </div>
+                }
+                actions={[
+                  <Button type="link" onClick={() => handleDelete(note.id)}>
+                    Hapus
+                  </Button>,
+                ]}
+              >
+                <p style={{ textAlign: "left" }}>{note.body}</p>
+              </Card>
+            </List.Item>
+          )}
+        />
+      )}
     </section>
   );
 };

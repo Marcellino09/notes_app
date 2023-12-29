@@ -1,78 +1,73 @@
-import { useState, useEffect } from "react";
+// pages/AddNote.js
+import React, { useState, useEffect } from "react";
+import { Input, Button, message } from "antd";
+import { Link, useNavigate } from "react-router-dom";
 
-const AddNote = ({ onAddNote }) => {
+const AddNote = ({ addNote, setNotes }) => {
+  const navigate = useNavigate();
+
+  if (typeof addNote !== "function") {
+    console.error("addNote is not a function");
+    return null; // or handle the error in some way
+  }
+
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
-  const [canSubmit, setCanSubmit] = useState(false);
-  const [isImportant, setIsImportant] = useState(false);
+  const [isDisabled, setIsDisabled] = useState(true);
 
   useEffect(() => {
-    setCanSubmit(title.trim() !== "" && body.trim() !== "");
+    setIsDisabled(!(title.trim() !== "" && body.trim() !== ""));
   }, [title, body]);
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    onAddNote({
+  const handleSubmit = async () => {
+    const newNote = {
+      id: new Date().getTime(),
       title,
-      createdAt: new Date().toISOString().split("T")[0],
       body,
-      isImportant,
-    });
-    setTitle("");
-    setBody("");
-    setIsImportant(false);
+      createdAt: new Date().toLocaleDateString(),
+    };
+
+    try {
+      await addNote(newNote);
+      setTitle("");
+      setBody("");
+      navigate("/home");
+    } catch (error) {
+      console.error("Failed to add note:", error);
+      // Handle error, show message, etc.
+      message.error("Failed to add note. Please try again.");
+    }
   };
 
   return (
-    <div>
-      <h1 className="text-2xl font-semibold mb-4">Tambah Catatan</h1>
-      <form onSubmit={handleSubmit}>
-        <div className="mb-4">
-          <label htmlFor="title" className="block text-gray-700 font-bold mb-2">
-            Judul Catatan
-          </label>
-          <input
-            type="text"
-            id="title"
-            className="border border-gray-300 rounded-md px-3 py-2 w-full focus:outline-none focus:ring-2 focus:ring-blue-500"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-          />
-        </div>
-        <div className="mb-4">
-          <label htmlFor="body" className="block text-gray-700 font-bold mb-2">
-            Isi Catatan
-          </label>
-          <textarea
-            id="body"
-            className="border border-gray-300 rounded-md px-3 py-2 w-full h-40 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
-            value={body}
-            onChange={(e) => setBody(e.target.value)}
-          ></textarea>
-        </div>
-        <div className="mb-4">
-          <label htmlFor="important" className="flex items-center">
-            <input
-              type="checkbox"
-              id="important"
-              className="form-checkbox border-gray-300 rounded text-blue-500 focus:ring-2 focus:ring-blue-500"
-              checked={isImportant}
-              onChange={(e) => setIsImportant(e.target.checked)}
-            />
-            <span className="ml-2 text-gray-700">Verify Note</span>
-          </label>
-        </div>
-        <button
-          type="submit"
-          className={`bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded ${
-            !canSubmit ? "opacity-50 cursor-not-allowed" : ""
-          }`}
-          disabled={!canSubmit}
-        >
-          Submit
-        </button>
-      </form>
-    </div>
+    <section>
+      <h2>Tambah Catatan</h2>
+      <Input
+        placeholder="Judul"
+        value={title}
+        onChange={(e) => setTitle(e.target.value)}
+        style={{ marginBottom: "16px" }}
+      />
+      <Input.TextArea
+        placeholder="Isi Catatan"
+        value={body}
+        onChange={(e) => setBody(e.target.value)}
+        style={{ marginBottom: "16px" }}
+      />
+      <Button
+        type="primary"
+        disabled={isDisabled}
+        onClick={handleSubmit}
+        style={{
+          marginRight: "16px",
+          backgroundColor: isDisabled ? "#d9d9d9" : "#1890ff",
+          borderColor: isDisabled ? "#d9d9d9" : "#1890ff",
+        }}
+      >
+        Tambah Catatan
+      </Button>
+      <Link to="/home">Kembali ke Daftar Catatan</Link>
+    </section>
   );
 };
 
